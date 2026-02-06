@@ -57,10 +57,10 @@ jobs:
         fi
         
         # We run the container and override the command to just check the download script's help
-        docker run --rm \
+        docker run --rm --entrypoint python \
           -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
           -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
           -e AWS_REGION=$AWS_REGION \
           -e S3_BUCKET=$S3_BUCKET \
           -e S3_MODEL_PREFIX=${S3_MODEL_PREFIX:-models/} \
-          tf-ml-modeling python download_models.py --help
+          tf-ml-modeling download_models.py --help
