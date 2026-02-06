@@ -1,0 +1,21 @@
+{
+    "directories": {
+        "models": "pre_trained_defect_models/trained_models",
+        "features": "pre_trained_defect_models/model_features",
+        "logs": "logs"
+    },
+    "defaults": {
+        "model_type": "randomforest",
+        "top_k_features": 20,
+        "tune_hyperparameters": false,
+        "n_jobs": 1,
+        "threshold": 0.5
+    },
+    "execution": {
+        "mode": "predict",
+        "model_name": "random_forest_model",
+        "csv_path": "test_input_50.csv",
+        "output_path": "config_results.csv",
+        "threshold": 0.5
+    }
+}

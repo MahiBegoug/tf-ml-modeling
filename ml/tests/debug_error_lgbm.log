@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "C:\Users\Admin\PycharmProjects\TFDefectGA\infrastructure\ml\tests\test_pretrained_usage.py", line 137, in test_lightgbm_with_schema
+    proba = result.predictions["probabilities"]
+            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+KeyError: 'probabilities'

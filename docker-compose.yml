@@ -1,0 +1,29 @@
+services:
+  ml-service:
+    build: .
+    image: tf-ml
+    volumes:
+      - .:/app
+      # OPTION A: Local Google Drive Mount (Windows/Mac)
+      # 1. Open the shared link -> "Add shortcut to Drive" -> Save to "My Drive"
+      # 2. Update path below to match where it is on your G: drive
+      # - "G:/My Drive/YOUR_SHORTCUT_NAME:/app/mlruns"
+    environment:
+      # 1. THE LOCATION (Where to store data)
+      # Local:
+      - MLFLOW_TRACKING_URI=file:///app/mlruns
+      # Cloud (Uncomment one):
+      # - MLFLOW_TRACKING_URI=s3://my-bucket/mlruns
+      # - MLFLOW_TRACKING_URI=gs://my-bucket/mlruns
+      # - MLFLOW_TRACKING_URI=wasbs://container@account.blob.core.windows.net/mlruns
+
+      # 2. THE CREDENTIALS (How to access it)
+      # AWS S3
+      # - AWS_ACCESS_KEY_ID=your_key
+      # - AWS_SECRET_ACCESS_KEY=your_secret
+      # - MLFLOW_S3_ENDPOINT_URL=https://s3.amazonaws.com
+      # Google Cloud Storage
+      # - GOOGLE_APPLICATION_CREDENTIALS=/app/gcp_creds.json
+      # Azure Blob
+      # - AZURE_STORAGE_CONNECTION_STRING=your_connection_string
+    command: python run_ml.py --help
