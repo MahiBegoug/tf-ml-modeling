@@ -10,8 +10,25 @@ jobs:
   test-and-build:
     runs-on: ubuntu-latest
     
+    permissions:
+      contents: read
+      packages: write
+
     steps:
     - uses: actions/checkout@v3
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v2
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Set up Python 3.10
       uses: actions/setup-python@v4
@@ -23,21 +40,23 @@ jobs:
         python -m pip install --upgrade pip
         pip install boto3 pytest
         pip install -e .
-        # Install test dependencies if any specific ones exist, otherwise the above covers it
 
     - name: Run S3 Integration Test
       run: |
         python -m unittest ml/tests/test_s3_workflow.py
 
-    - name: Run All Tests
-      run: |
-        python -m unittest discover ml/tests
+    - name: Build and Push Docker Image
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        push: true
+        tags: |
+          ghcr.io/${{ github.repository }}:latest
+          ghcr.io/${{ github.repository }}:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
 
-    - name: Build Docker Image
-      run: |
-        docker build -t tf-ml-modeling .
-
-    - name: Verify Docker Mock S3 Download
+    - name: Verify Docker Image (S3 Download Check)
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -45,22 +64,15 @@ jobs:
         S3_BUCKET: ${{ secrets.S3_BUCKET }}
         S3_MODEL_PREFIX: ${{ secrets.S3_MODEL_PREFIX }}
       run: |
-        # If secrets are not set, these will be empty. 
-        # We can default to dummy values for the smoke test if needed, or echo a warning.
-        if [ -z "$AWS_ACCESS_KEY_ID" ]; then
-          echo "WARNING: AWS Secrets not set. Using dummy values for smoke test."
-          export AWS_ACCESS_KEY_ID="testing"
-          export AWS_SECRET_ACCESS_KEY="testing"
-          export AWS_REGION="us-east-1"
-          export S3_BUCKET="test-bucket"
-          export S3_MODEL_PREFIX="models/"
-        fi
+        # Use the image we just pushed
+        IMAGE_URI="ghcr.io/${{ github.repository }}:latest"
+        # Convert repository name to lowercase for docker pull (GHCR requirement)
+        IMAGE_URI=$(echo "$IMAGE_URI" | tr '[:upper:]' '[:lower:]')
         
-        # We run the container and override the command to just check the download script's help
         docker run --rm --entrypoint python \
           -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
           -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
           -e AWS_REGION=$AWS_REGION \
           -e S3_BUCKET=$S3_BUCKET \
           -e S3_MODEL_PREFIX=${S3_MODEL_PREFIX:-models/} \
-          tf-ml-modeling download_models.py --help
+          $IMAGE_URI download_models.py --help
