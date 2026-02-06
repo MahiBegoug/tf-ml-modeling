@@ -97,7 +97,6 @@ def cmd_predict(args, config):
             # 4. So we must download to the PARENT of service.models_dir
             
             download_target = os.path.dirname(service.models_dir)
-            download_target = os.path.dirname(service.models_dir)
             if not download_target or download_target == "":
                 download_target = "." # Fallback to current dir if models_dir is at root
             

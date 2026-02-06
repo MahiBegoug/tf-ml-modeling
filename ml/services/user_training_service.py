@@ -448,12 +448,57 @@ class UserTrainingService:
 
         # 2. Load Feature Schema
         schema_path = os.path.join(self.features_dir, f"{model_name}_features.csv")
-        if os.path.exists(schema_path):
-            with open(schema_path, "r") as f:
-                selected_features = [line.strip() for line in f.readlines()]
-            logger.info(f"✓ Loaded feature schema: {len(selected_features)} features")
+        selected_features = None
+
+        def load_schema_if_exists(path):
+            if os.path.exists(path):
+                with open(path, "r") as f:
+                    features = [line.strip() for line in f.readlines()]
+                # Heuristic: Check for generic "f0", "f1" headers which indicate bad schema
+                if len(features) > 0 and features[0] == "f0" and features[1] == "f1":
+                    logger.warning(f"⚠️ Ignoring generic schema at {path} (f0, f1 detected).")
+                    return None
+                return features
+            return None
+
+        # A. Try Exact Match
+        selected_features = load_schema_if_exists(schema_path)
+
+        # B. Fallback: Remove "_model" (random_forest_model -> random_forest)
+        if not selected_features and "_model" in model_name:
+            short_name = model_name.replace("_model", "")
+            path = os.path.join(self.features_dir, f"{short_name}_features.csv")
+            selected_features = load_schema_if_exists(path)
+            
+            # C. Fallback: Remove Underscores (random_forest -> randomforest)
+            if not selected_features:
+                clean_name = short_name.replace("_", "")
+                path = os.path.join(self.features_dir, f"{clean_name}_features.csv")
+                logger.info(f"ℹ️ Checking underscore-stripped fallback: {path}")
+                selected_features = load_schema_if_exists(path)
+
+        # 2.5. Validate and Truncate Schema to Match Model's Expected Features
+        if selected_features:
+            # Remove header row if present (e.g., "Feature")
+            if selected_features and selected_features[0] == "Feature":
+                selected_features = selected_features[1:]
+                logger.info("ℹ️ Removed 'Feature' header from schema")
+            
+            # Check model's expected feature count
+            model_expected_features = None
+            if hasattr(model, 'n_features_in_'):
+                model_expected_features = model.n_features_in_
+            
+            if model_expected_features and len(selected_features) > model_expected_features:
+                logger.warning(
+                    f"⚠️ Schema has {len(selected_features)} features, but model expects {model_expected_features}. "
+                    f"Auto-truncating to first {model_expected_features} features."
+                )
+                selected_features = selected_features[:model_expected_features]
+            
+            logger.info(f"✓ Final feature schema: {len(selected_features)} features")
         else:
-            logger.warning(f"Feature schema not found at {schema_path}. Assuming all columns in CSV are features.")
+            logger.warning(f"❌ Feature schema not found or invalid. Assuming all columns in CSV are features.")
             selected_features = None
 
         # 3. Load Data
