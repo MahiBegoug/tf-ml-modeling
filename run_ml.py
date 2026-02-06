@@ -97,6 +97,34 @@ def cmd_predict(args, config):
     print("\n✅ Direct Testing Complete!")
     print(f"Saved to: {output_csv}")
     print(results.head())
+    
+    # Auto-upload to S3 if configured
+    s3_bucket = os.getenv('S3_BUCKET')
+    if s3_bucket:
+        from ml.utils.s3_utils import upload_file_to_s3
+        s3_prefix = os.getenv('S3_MODEL_PREFIX', 'models/').rstrip('/')
+        
+        # Generate Versioned Filename: predictions_<COMMIT>_<TIMESTAMP>.csv
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        commit_hash = os.getenv('GITHUB_SHA', 'manual')[:7]  # Short hash
+        
+        base_name = os.path.basename(output_csv)
+        name_stem = os.path.splitext(base_name)[0]
+        ext = os.path.splitext(base_name)[1]
+        
+        versioned_name = f"{name_stem}_{commit_hash}_{timestamp}{ext}"
+        target_key = f"predictions/{versioned_name}"
+        
+        print(f"🚀 Uploading predictions to s3://{s3_bucket}/{target_key}...")
+        upload_file_to_s3(
+            local_path=output_csv,
+            bucket_name=s3_bucket,
+            s3_prefix="predictions", 
+            object_name=versioned_name,
+            aws_region=os.getenv('AWS_REGION', 'us-east-1')
+        )
+        print("✓ Upload Complete")
 
 def cmd_incremental(args, config):
     print("="*50)
