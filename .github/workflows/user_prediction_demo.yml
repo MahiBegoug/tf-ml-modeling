@@ -6,7 +6,7 @@ on:
       model_name:
         description: 'Model Name (in S3)'
         required: true
-        default: 'defect_predictor'
+        default: 'random_forest_model'
       threshold:
         description: 'Prediction Threshold (0.0 - 1.0)'
         required: false
@@ -17,7 +17,7 @@ on:
       s3_prefix_override:
         description: 'S3 Model Prefix (Optional Override)'
         required: false
-        default: 'models/'
+        default: 'pre_trained_defect_models/'
 
 jobs:
   predict-test:
