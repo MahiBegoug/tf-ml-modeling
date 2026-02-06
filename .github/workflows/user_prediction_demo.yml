@@ -6,7 +6,7 @@ on:
       model_name:
         description: 'Model Name (in S3)'
         required: true
-        default: 'random_forest_model'
+        default: 'randomforest_model'
       threshold:
         description: 'Prediction Threshold (0.0 - 1.0)'
         required: false
