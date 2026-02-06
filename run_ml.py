@@ -97,15 +97,30 @@ def cmd_predict(args, config):
             # 4. So we must download to the PARENT of service.models_dir
             
             download_target = os.path.dirname(service.models_dir)
+            download_target = os.path.dirname(service.models_dir)
             if not download_target or download_target == "":
                 download_target = "." # Fallback to current dir if models_dir is at root
             
-            download_s3_folder(
+            print(f"DEBUG: models_dir={service.models_dir}")
+            print(f"DEBUG: download_target={download_target}")
+            print(f"DEBUG: s3_prefix={s3_prefix}")
+            
+            success = download_s3_folder(
                 bucket_name=s3_bucket,
                 s3_prefix=s3_prefix,
                 local_dir=download_target,
                 aws_region=os.getenv('AWS_REGION', 'us-east-1')
             )
+            
+            if success:
+                print("DEBUG: Download returned Success.")
+            else:
+                print("DEBUG: Download returned FAILURE.")
+
+            print("DEBUG: File system state after download:")
+            for root, dirs, files in os.walk(download_target):
+                for name in files:
+                    print(os.path.join(root, name))
         else:
             print(f"⚠️ Model '{model_name}' not found and S3_BUCKET not set. Prediction may fail.")
 
