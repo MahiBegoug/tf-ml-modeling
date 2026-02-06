@@ -5,16 +5,18 @@ FROM python:3.10-slim
 WORKDIR /app
 
 # Install system dependencies if needed (e.g. for lightgbm sometimes)
-# curl, unzip required for rclone
+# curl, unzip required for AWS CLI
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
     curl \
     unzip \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Rclone and gdown (for easier drive downloads)
-RUN curl https://rclone.org/install.sh | bash \
-    && pip install gdown
+# Install AWS CLI v2
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
+    && unzip awscliv2.zip \
+    && ./aws/install \
+    && rm -rf awscliv2.zip aws
 
 # Copy configuration files first for better caching
 COPY pyproject.toml setup.py requirements.txt ./

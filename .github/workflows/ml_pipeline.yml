@@ -1,0 +1,40 @@
+name: ML Pipeline S3 & Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install boto3
+        pip install -e .
+        # Install test dependencies if any specific ones exist, otherwise the above covers it
+
+    - name: Run S3 Integration Test
+      run: |
+        python -m unittest ml/tests/test_s3_workflow.py
+
+    - name: Run All Tests
+      run: |
+        python -m unittest discover ml/tests
+
+    - name: Build Docker Image
+      run: |
+        docker build -t tf-ml-modeling .
+
+

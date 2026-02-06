@@ -13,6 +13,7 @@ setup(
         "numpy>=1.21.0",
         "lightgbm>=3.3.0",
         "mlflow>=2.0.0",
+        "boto3>=1.26.0",
     ],
     python_requires=">=3.8",
     extras_require={

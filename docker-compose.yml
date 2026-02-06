@@ -19,11 +19,27 @@ services:
 
       # 2. THE CREDENTIALS (How to access it)
       # AWS S3
-      # - AWS_ACCESS_KEY_ID=your_key
-      # - AWS_SECRET_ACCESS_KEY=your_secret
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
       # - MLFLOW_S3_ENDPOINT_URL=https://s3.amazonaws.com
+      
+      # 3. S3 MODEL DOWNLOAD CONFIGURATION
+      # Set these to download pre-trained models from S3 on container startup
+      - S3_BUCKET=${S3_BUCKET:-}
+      - S3_MODEL_PREFIX=${S3_MODEL_PREFIX:-models/}
+      - LOCAL_MODEL_DIR=/app/pre_trained_defect_models
+      
       # Google Cloud Storage
       # - GOOGLE_APPLICATION_CREDENTIALS=/app/gcp_creds.json
       # Azure Blob
       # - AZURE_STORAGE_CONNECTION_STRING=your_connection_string
-    command: python run_ml.py --help
+    command: >
+      sh -c "
+      if [ -n \"$$S3_BUCKET\" ]; then
+        echo 'Downloading models from S3...';
+        python download_models.py --skip-if-exists || echo 'Model download failed, continuing...';
+      fi;
+      python run_ml.py --help
+      "
+
