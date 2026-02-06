@@ -45,14 +45,18 @@ jobs:
       run: |
         python -m unittest ml/tests/test_s3_workflow.py
 
+    - name: Prepare Lowercase Image Name
+      run: |
+        echo "IMAGE_NAME=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
     - name: Build and Push Docker Image
       uses: docker/build-push-action@v4
       with:
         context: .
         push: true
         tags: |
-          ghcr.io/${{ github.repository }}:latest
-          ghcr.io/${{ github.repository }}:${{ github.sha }}
+          ghcr.io/${{ env.IMAGE_NAME }}:latest
+          ghcr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
@@ -65,9 +69,7 @@ jobs:
         S3_MODEL_PREFIX: ${{ secrets.S3_MODEL_PREFIX }}
       run: |
         # Use the image we just pushed
-        IMAGE_URI="ghcr.io/${{ github.repository }}:latest"
-        # Convert repository name to lowercase for docker pull (GHCR requirement)
-        IMAGE_URI=$(echo "$IMAGE_URI" | tr '[:upper:]' '[:lower:]')
+        IMAGE_URI="ghcr.io/${{ env.IMAGE_NAME }}:latest"
         
         docker run --rm --entrypoint python \
           -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \

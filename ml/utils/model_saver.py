@@ -13,6 +13,7 @@ Saves models as bundles containing:
 import os
 import joblib
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 from ml.utils.logger import logger
 
@@ -73,6 +74,58 @@ class ModelSaver:
                 logger.info(f"  - Features: {len(feature_names)}")
             if scaler:
                 logger.info(f"  - Scaler: {type(scaler).__name__}")
+                
+            # --- Check for S3 Auto-Upload ---
+            s3_bucket = os.getenv('S3_BUCKET')
+            if s3_bucket:
+                from ml.utils.s3_utils import upload_file_to_s3
+                
+                # Determine prefix (folder)
+                # By default, we might upload to 'pre_trained_defect_models/trained_models/'
+                # But here we just want to mimic the structure.
+                # Let's assume S3_MODEL_PREFIX points to root (e.g. pre_trained_defect_models/)
+                # And we want to put models in 'trained_models' subfolder if that matches local structure?
+                # Or just use the S3_MODEL_PREFIX as the folder.
+                
+                # Simple logic: Upload to S3_MODEL_PREFIX/filename
+                s3_prefix = os.getenv('S3_MODEL_PREFIX', 'models/')
+                # Ensure it points to 'trained_models' if that's the convention?
+                # The user's S3 has 'pre_trained_defect_models/trained_models/' structure.
+                # So if S3_MODEL_PREFIX is 'pre_trained_defect_models/', we arguably should append 'trained_models/' 
+                # if the local file is in a 'trained_models' dir.
+                
+                # To be fail-safe: just upload to S3_MODEL_PREFIX + 'trained_models/'
+                # OR simpler: just S3_MODEL_PREFIX 
+                
+                # Correct Logic: 
+                # If S3_MODEL_PREFIX is "pre_trained_defect_models/", we want to put the model in a subfolder "trained_models" 
+                # IF that corresponds to how we organize things.
+                # Let's just append "trained_models" to prompt user convention.
+                
+                target_prefix = s3_prefix.rstrip('/') + "/trained_models"
+                
+                # Generate versioned filename for S3
+                # e.g., mymodel.joblib -> mymodel_v20231027103015.joblib
+                # Note: 'datetime' is already imported at top level
+                timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                name_stem = Path(filename).stem
+                versioned_filename = f"{name_stem}_v{timestamp}.joblib"
+                
+                logger.info(f"🚀 Detected S3_BUCKET. Uploading to: s3://{s3_bucket}/{target_prefix}/{versioned_filename}...")
+                
+                upload_success = upload_file_to_s3(
+                    local_path=save_path,
+                    bucket_name=s3_bucket,
+                    s3_prefix=target_prefix,
+                    object_name=versioned_filename,
+                    aws_region=os.getenv('AWS_REGION', 'us-east-1')
+                )
+                
+                if upload_success:
+                    logger.info(f"✓ Successfully uploaded {versioned_filename} to S3")
+                else:
+                    logger.warning(f"⚠ Failed to upload {versioned_filename} to S3")
+
             return save_path
             
         except Exception as e:

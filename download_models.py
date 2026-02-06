@@ -11,13 +11,7 @@ import sys
 import argparse
 import logging
 from pathlib import Path
-
-try:
-    import boto3
-    from botocore.exceptions import ClientError, NoCredentialsError
-except ImportError:
-    print("ERROR: boto3 is not installed. Please install it: pip install boto3")
-    sys.exit(1)
+from ml.utils.s3_utils import download_s3_folder
 
 # Configure logging
 logging.basicConfig(
@@ -25,80 +19,6 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-
-
-def download_s3_folder(bucket_name, s3_prefix, local_dir, aws_region=None):
-    """
-    Download all files from an S3 bucket prefix to a local directory.
-    
-    Args:
-        bucket_name: Name of the S3 bucket
-        s3_prefix: Prefix path in S3 (e.g., 'models/' or 'models/trained_models/')
-        local_dir: Local directory to download files to
-        aws_region: AWS region (optional, uses default if not specified)
-    """
-    # Create S3 client
-    if aws_region:
-        s3_client = boto3.client('s3', region_name=aws_region)
-    else:
-        s3_client = boto3.client('s3')
-    
-    # Ensure local directory exists
-    local_path = Path(local_dir)
-    local_path.mkdir(parents=True, exist_ok=True)
-    
-    # Remove trailing slash from prefix if present
-    s3_prefix = s3_prefix.rstrip('/')
-    
-    try:
-        logger.info(f"Listing objects in s3://{bucket_name}/{s3_prefix}")
-        
-        # List all objects with the given prefix
-        paginator = s3_client.get_paginator('list_objects_v2')
-        pages = paginator.paginate(Bucket=bucket_name, Prefix=s3_prefix)
-        
-        file_count = 0
-        for page in pages:
-            if 'Contents' not in page:
-                logger.warning(f"No objects found with prefix: {s3_prefix}")
-                continue
-                
-            for obj in page['Contents']:
-                s3_key = obj['Key']
-                
-                # Skip if it's just a folder marker
-                if s3_key.endswith('/'):
-                    continue
-                
-                # Calculate relative path and local file path
-                if s3_prefix:
-                    relative_path = s3_key[len(s3_prefix):].lstrip('/')
-                else:
-                    relative_path = s3_key
-                
-                local_file = local_path / relative_path
-                
-                # Create parent directories if needed
-                local_file.parent.mkdir(parents=True, exist_ok=True)
-                
-                # Download the file
-                logger.info(f"Downloading: {s3_key} -> {local_file}")
-                s3_client.download_file(bucket_name, s3_key, str(local_file))
-                file_count += 1
-        
-        logger.info(f"Successfully downloaded {file_count} files from S3")
-        return True
-        
-    except NoCredentialsError:
-        logger.error("AWS credentials not found. Please configure AWS credentials.")
-        logger.error("You can set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables.")
-        return False
-    except ClientError as e:
-        logger.error(f"AWS S3 error: {e}")
-        return False
-    except Exception as e:
-        logger.error(f"Unexpected error: {e}")
-        return False
 
 
 def main():
