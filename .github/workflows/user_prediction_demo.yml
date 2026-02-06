@@ -7,6 +7,17 @@ on:
         description: 'Model Name (in S3)'
         required: true
         default: 'defect_predictor'
+      threshold:
+        description: 'Prediction Threshold (0.0 - 1.0)'
+        required: false
+        default: '0.5'
+      s3_bucket_override:
+        description: 'S3 Bucket (Optional Override)'
+        required: false
+      s3_prefix_override:
+        description: 'S3 Model Prefix (Optional Override)'
+        required: false
+        default: 'models/'
 
 jobs:
   predict-test:
@@ -31,8 +42,9 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
-          S3_BUCKET: ${{ secrets.S3_BUCKET }}
-          S3_MODEL_PREFIX: ${{ secrets.S3_MODEL_PREFIX }}
+          # Use Override if provided, else Use Secret
+          S3_BUCKET: ${{ inputs.s3_bucket_override || secrets.S3_BUCKET }}
+          S3_MODEL_PREFIX: ${{ inputs.s3_prefix_override || secrets.S3_MODEL_PREFIX }}
         run: |
           echo "🚀 Pulling image: ghcr.io/${{ env.IMAGE_NAME }}:latest"
           
@@ -45,12 +57,14 @@ jobs:
             -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
             -e AWS_REGION=$AWS_REGION \
             -e S3_BUCKET=$S3_BUCKET \
-            -e S3_MODEL_PREFIX=${S3_MODEL_PREFIX:-models/} \
+            -e S3_MODEL_PREFIX=${S3_MODEL_PREFIX} \
+            -e GITHUB_SHA=${{ github.sha }} \
             ghcr.io/${{ env.IMAGE_NAME }}:latest \
             predict \
               --csv /app/data/input.csv \
               --model ${{ inputs.model_name }} \
-              --output /app/data/predictions.csv
+              --output /app/data/predictions.csv \
+              --threshold ${{ inputs.threshold }}
 
       - name: Show Results
         run: |

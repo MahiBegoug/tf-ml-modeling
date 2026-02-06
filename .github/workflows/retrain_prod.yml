@@ -10,6 +10,10 @@ on:
         description: 'Model Type (randomforest, xgboost, etc)'
         default: 'randomforest'
         required: true
+      s3_prefix_override:
+        description: 'Target S3 Prefix (e.g., models/staging/)'
+        required: false
+        default: 'models/'
 
 jobs:
   retrain-production:
@@ -28,7 +32,8 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
           S3_BUCKET: ${{ secrets.S3_BUCKET }}
-          S3_MODEL_PREFIX: ${{ secrets.S3_MODEL_PREFIX }}
+          # Use Override from inputs
+          S3_MODEL_PREFIX: ${{ inputs.s3_prefix_override }}
         run: |
           echo "🚀 Pulling Production Image: ghcr.io/${{ env.IMAGE_NAME }}:latest"
           
@@ -46,7 +51,7 @@ jobs:
             -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
             -e AWS_REGION=$AWS_REGION \
             -e S3_BUCKET=$S3_BUCKET \
-            -e S3_MODEL_PREFIX=${S3_MODEL_PREFIX:-models/} \
+            -e S3_MODEL_PREFIX=${S3_MODEL_PREFIX} \
             ghcr.io/${{ env.IMAGE_NAME }}:latest \
             train \
               --csv /app/data/new_data.csv \
