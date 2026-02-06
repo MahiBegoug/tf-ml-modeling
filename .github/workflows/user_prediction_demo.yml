@@ -47,7 +47,7 @@ jobs:
             -e S3_BUCKET=$S3_BUCKET \
             -e S3_MODEL_PREFIX=${S3_MODEL_PREFIX:-models/} \
             ghcr.io/${{ env.IMAGE_NAME }}:latest \
-            python run_ml.py predict \
+            predict \
               --csv /app/data/input.csv \
               --model ${{ inputs.model_name }} \
               --output /app/data/predictions.csv

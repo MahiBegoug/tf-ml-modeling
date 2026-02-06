@@ -81,6 +81,9 @@ def cmd_predict(args, config):
         
     # Get Threshold
     threshold = config.get("execution", {}).get("threshold")
+    if hasattr(args, 'threshold') and args.threshold is not None:
+        threshold = args.threshold
+        
     if threshold is None:
         threshold = defaults.get("threshold", 0.5)
         
@@ -208,6 +211,7 @@ def main():
     pred_parser.add_argument("--csv", required=True, help="Input CSV file")
     pred_parser.add_argument("--model", required=True, help="Model name")
     pred_parser.add_argument("--output", help="Output CSV path")
+    pred_parser.add_argument("--threshold", type=float, help="Classification threshold (default: config or 0.5)")
     
     # Incremental Command
     inc_parser = subparsers.add_parser("incremental", help="Update existing model (Incremental Learning)")

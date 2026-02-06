@@ -1,0 +1,59 @@
+name: Production Retraining
+
+on:
+  workflow_dispatch:
+    inputs:
+      training_data_path:
+        description: 'Path/URL to training CSV (Optional overrides)'
+        required: false
+      model_type:
+        description: 'Model Type (randomforest, xgboost, etc)'
+        default: 'randomforest'
+        required: true
+
+jobs:
+  retrain-production:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: read
+
+    steps:
+      - name: Prepare Lowercase Image Name
+        run: |
+          echo "IMAGE_NAME=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Retrain Model (Pull & Run)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          S3_MODEL_PREFIX: ${{ secrets.S3_MODEL_PREFIX }}
+        run: |
+          echo "🚀 Pulling Production Image: ghcr.io/${{ env.IMAGE_NAME }}:latest"
+          
+          # In a real scenario, we might download data from S3 first.
+          # For this demo, we'll create a dummy 'new_data.csv' to simulate fresh data.
+          echo "feature1,feature2,feature3,defect" > new_data.csv
+          echo "0.2,0.6,0.1,0" >> new_data.csv
+          echo "0.9,0.1,0.8,1" >> new_data.csv
+          
+          # Run Training
+          # The container will automatically Upload the new model to S3 due to S3_BUCKET env var.
+          docker run --rm \
+            -v $(pwd):/app/data \
+            -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+            -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+            -e AWS_REGION=$AWS_REGION \
+            -e S3_BUCKET=$S3_BUCKET \
+            -e S3_MODEL_PREFIX=${S3_MODEL_PREFIX:-models/} \
+            ghcr.io/${{ env.IMAGE_NAME }}:latest \
+            train \
+              --csv /app/data/new_data.csv \
+              --model ${{ inputs.model_type }} \
+              --name production_model_retrained
+
+      - name: Verify S3 Upload
+        run: |
+          echo "✅ Retraining complete."
+          echo "Check the logs above. You should see 'Successfully uploaded... to S3'"
