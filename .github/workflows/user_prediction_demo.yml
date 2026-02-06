@@ -1,0 +1,58 @@
+name: User Prediction Demo
+
+on:
+  workflow_dispatch:
+    inputs:
+      model_name:
+        description: 'Model Name (in S3)'
+        required: true
+        default: 'defect_predictor'
+
+jobs:
+  predict-test:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: read  # Allow pulling image
+
+    steps:
+      - name: Prepare Lowercase Image Name
+        run: |
+          echo "IMAGE_NAME=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Create Dummy Input Data
+        run: |
+          # Create a dummy CSV matching expected features
+          echo "feature1,feature2,feature3,defect" > input.csv
+          echo "0.1,0.5,0.9,0" >> input.csv
+          echo "0.8,0.2,0.1,1" >> input.csv
+
+      - name: Run Prediction (Using Docker Image)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          S3_MODEL_PREFIX: ${{ secrets.S3_MODEL_PREFIX }}
+        run: |
+          echo "🚀 Pulling image: ghcr.io/${{ env.IMAGE_NAME }}:latest"
+          
+          # Run the container
+          # -v $(pwd):/app/data  -> Mount current dir to /app/data so we can read input.csv and write output
+          
+          docker run --rm \
+            -v $(pwd):/app/data \
+            -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+            -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+            -e AWS_REGION=$AWS_REGION \
+            -e S3_BUCKET=$S3_BUCKET \
+            -e S3_MODEL_PREFIX=${S3_MODEL_PREFIX:-models/} \
+            ghcr.io/${{ env.IMAGE_NAME }}:latest \
+            python run_ml.py predict \
+              --csv /app/data/input.csv \
+              --model ${{ inputs.model_name }} \
+              --output /app/data/predictions.csv
+
+      - name: Show Results
+        run: |
+          ls -l predictions.csv
+          cat predictions.csv
