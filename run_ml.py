@@ -75,6 +75,33 @@ def cmd_predict(args, config):
         features_dir=dirs.get("features", "features")
     )
     
+    # --- Auto-Download Models if Missing ---
+    model_name = args.model
+    # Check if model exists locally (simple check based on default naming)
+    # The service expects models in {models_dir}/trained_models/{model_name}.joblib
+    model_path = os.path.join(service.models_dir, "trained_models", f"{model_name}.joblib")
+    
+    if not os.path.exists(model_path):
+        s3_bucket = os.getenv('S3_BUCKET')
+        if s3_bucket:
+            print(f"⚠️ Model '{model_name}' not found locally at {model_path}")
+            print("🚀 S3_BUCKET detected. Attempting to download models from S3...")
+            from ml.utils.s3_utils import download_s3_folder
+            
+            s3_prefix = os.getenv('S3_MODEL_PREFIX', 'models/')
+            # We download the whole structure to 'models' (or whatever dirs['models'] is)
+            # The structure in S3 is typically models/trained_models/...
+            # So we map S3 Prefix -> Local Models Dir
+            
+            download_s3_folder(
+                bucket_name=s3_bucket,
+                s3_prefix=s3_prefix,
+                local_dir=service.models_dir,
+                aws_region=os.getenv('AWS_REGION', 'us-east-1')
+            )
+        else:
+            print(f"⚠️ Model '{model_name}' not found and S3_BUCKET not set. Prediction may fail.")
+
     output_csv = args.output
     if not output_csv:
         output_csv = f"predictions_{os.path.basename(args.csv)}"
