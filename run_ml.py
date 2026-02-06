@@ -77,9 +77,9 @@ def cmd_predict(args, config):
     
     # --- Auto-Download Models if Missing ---
     model_name = args.model
-    # Check if model exists locally (simple check based on default naming)
-    # The service expects models in {models_dir}/trained_models/{model_name}.joblib
-    model_path = os.path.join(service.models_dir, "trained_models", f"{model_name}.joblib")
+    # Check if model exists locally
+    # Service expects: {models_dir}/{model_name}.joblib
+    model_path = os.path.join(service.models_dir, f"{model_name}.joblib")
     
     if not os.path.exists(model_path):
         s3_bucket = os.getenv('S3_BUCKET')
@@ -89,14 +89,21 @@ def cmd_predict(args, config):
             from ml.utils.s3_utils import download_s3_folder
             
             s3_prefix = os.getenv('S3_MODEL_PREFIX', 'models/')
-            # We download the whole structure to 'models' (or whatever dirs['models'] is)
-            # The structure in S3 is typically models/trained_models/...
-            # So we map S3 Prefix -> Local Models Dir
+            
+            # CRITICAL FIX: 
+            # 1. S3 structure includes 'trained_models/' (e.g., prefix/trained_models/model.joblib)
+            # 2. service.models_dir likely ends in 'trained_models' (e.g., /app/models/trained_models)
+            # 3. If we download TO service.models_dir, we get /app/models/trained_models/trained_models/... (Double Nesting)
+            # 4. So we must download to the PARENT of service.models_dir
+            
+            download_target = os.path.dirname(service.models_dir)
+            if not download_target or download_target == "":
+                download_target = "." # Fallback to current dir if models_dir is at root
             
             download_s3_folder(
                 bucket_name=s3_bucket,
                 s3_prefix=s3_prefix,
-                local_dir=service.models_dir,
+                local_dir=download_target,
                 aws_region=os.getenv('AWS_REGION', 'us-east-1')
             )
         else:
