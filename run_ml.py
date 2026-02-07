@@ -109,11 +109,36 @@ def cmd_predict(args, config):
                 aws_region=os.getenv('AWS_REGION', 'us-east-1')
             )
             
-            print(f"🔍 DEBUG: Download target: {download_target}")
+            # --- Also Download Features ---
+            # Features are typically in a sibling folder to models in S3:
+            # Models:   .../pre_trained_defect_models/trained_models/
+            # Features: .../pre_trained_defect_models/model_features/
+            
+            # Derive features prefix
+            s3_features_prefix = s3_prefix.replace("trained_models", "model_features")
+            if s3_features_prefix == s3_prefix:
+                # Fallback if naming checks fail: just append _features
+                # But based on user screenshot, it's model_features
+                s3_features_prefix = "pre_trained_defect_models/model_features/"
+                
+            features_target = service.features_dir
+            print(f"🚀 Attempting to download features from {s3_features_prefix} to {features_target}...")
+            
+            download_s3_folder(
+                bucket_name=s3_bucket,
+                s3_prefix=s3_features_prefix,
+                local_dir=features_target,
+                aws_region=os.getenv('AWS_REGION', 'us-east-1')
+            )
+
+            print(f"🔍 DEBUG: Models target: {download_target}")
             if os.path.exists(download_target):
                 print(f"🔍 DEBUG: Listing {download_target}: {os.listdir(download_target)}")
-            else:
-                print(f"🔍 DEBUG: {download_target} does not exist.")
+            
+            print(f"🔍 DEBUG: Features target: {features_target}")
+            if os.path.exists(features_target):
+                print(f"🔍 DEBUG: Listing {features_target}: {os.listdir(features_target)}")
+
         else:
             print(f"⚠️ Model '{model_name}' not found and S3_BUCKET not set. Prediction may fail.")
 
