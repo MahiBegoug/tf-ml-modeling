@@ -20,6 +20,7 @@ sys.path.append(os.getcwd())
 
 from ml.services.incremental_learning_service import IncrementalLearningService
 from ml.services.user_training_service import UserTrainingService
+from ml.scripts.aggregate_history import aggregate_prediction_history
 from ml.utils.logger import logger
 import pandas as pd
 import numpy as np
@@ -208,6 +209,35 @@ def cmd_incremental(args, config):
     print(f"Method Used: {metrics.get('update_method')}")
     print(f"MCC on New Data: {metrics.get('mcc', 'N/A')}")
 
+def cmd_aggregate(args, config):
+    print("="*50)
+    print("MODE: HISTORY AGGREGATION")
+    print("="*50)
+    
+    s3_bucket = os.getenv("S3_BUCKET")
+    if not s3_bucket:
+        print("❌ S3_BUCKET environment variable not set.")
+        return
+        
+    output_file = args.output
+    if not output_file:
+        output_file = "prediction_history_master.csv"
+        
+    print(f"Aggregating history from s3://{s3_bucket}/predictions/...")
+    
+    result = aggregate_prediction_history(
+        bucket_name=s3_bucket,
+        s3_prefix=args.prefix,
+        output_file=output_file,
+        aws_region=os.getenv("AWS_REGION", "us-east-1")
+    )
+    
+    if result:
+        print(f"✅ Aggregation Complete! Master file saved to: {result}")
+        print(f"   Also uploaded to s3://{s3_bucket}/history/{output_file}")
+    else:
+        print("❌ Aggregation Failed. Check logs.")
+
 def run_from_config(config):
     """Execute based purely on config file."""
     exec_config = config.get("execution", {})
@@ -281,6 +311,11 @@ def main():
     inc_parser.add_argument("--target", default="defect", help="Target column name")
     inc_parser.add_argument("--model", required=True, help="Model name to update")
     
+    # Aggregation Command
+    agg_parser = subparsers.add_parser("aggregate", help="Aggregate prediction history from S3")
+    agg_parser.add_argument("--prefix", default="predictions/", help="S3 prefix to search (default: predictions/)")
+    agg_parser.add_argument("--output", help="Output filename (default: prediction_history_master.csv)")
+    
     args = parser.parse_args()
     
     if args.command == "train":
@@ -289,6 +324,8 @@ def main():
         cmd_predict(args, config)
     elif args.command == "incremental":
         cmd_incremental(args, config)
+    elif args.command == "aggregate":
+        cmd_aggregate(args, config)
     else:
         # No command argument -> Use Config
         run_from_config(config)

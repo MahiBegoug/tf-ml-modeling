@@ -26,6 +26,10 @@ jobs:
       packages: read  # Allow pulling image
 
     steps:
+
+      - name: Checkout Code (To use latest scripts)
+        uses: actions/checkout@v3
+
       - name: Prepare Lowercase Image Name
         run: |
           echo "IMAGE_NAME=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
@@ -74,7 +78,30 @@ jobs:
               --output /app/data/predictions.csv \
               --threshold ${{ inputs.threshold }}
 
+
       - name: Show Results
         run: |
           ls -l predictions.csv
           cat predictions.csv
+
+      - name: Aggregate History (Using Mounted Code)
+        if: success()
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          S3_BUCKET: ${{ inputs.s3_bucket_override || secrets.S3_BUCKET }}
+        run: |
+          echo "🚀 Running History Aggregation..."
+          
+          # Mount local code to override container code
+          docker run --rm \
+            -v $(pwd):/app/data \
+            -v $(pwd)/ml:/app/ml \
+            -v $(pwd)/run_ml.py:/app/run_ml.py \
+            -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+            -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+            -e AWS_REGION=$AWS_REGION \
+            -e S3_BUCKET=$S3_BUCKET \
+            ghcr.io/${{ env.IMAGE_NAME }}:latest \
+            aggregate
