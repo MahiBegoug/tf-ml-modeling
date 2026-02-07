@@ -97,7 +97,7 @@ def aggregate_prediction_history(
         return None
         
     master_df = pd.concat(all_dfs, ignore_index=True)
-    logger.info(f"✓ Aggregated {len(master_df)} total rows from {len(all_dfs)} files.")
+    logger.info(f"✓ Aggregated {len(master_df)} rows and {len(master_df.columns)} columns from {len(all_dfs)} files.")
     
     # Deduplicate
     initial_count = len(master_df)

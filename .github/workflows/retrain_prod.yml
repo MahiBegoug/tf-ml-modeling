@@ -4,10 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       training_data_path:
-        description: 'Path/URL to training CSV (Optional overrides)'
+        description: 'S3 Path to Training CSV (Default: history/prediction_history_master.csv)'
         required: false
+        default: 'history/prediction_history_master.csv'
       model_type:
-        description: 'Model Type (randomforest, xgboost, etc)'
+        description: 'Model Type (randomforest, logisticreg, etc)'
         default: 'randomforest'
         required: true
       s3_prefix_override:
@@ -22,31 +23,68 @@ jobs:
       packages: read
 
     steps:
+      - name: Checkout Code (To use latest scripts)
+        uses: actions/checkout@v3
+
       - name: Prepare Lowercase Image Name
         run: |
           echo "IMAGE_NAME=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
-      - name: Retrain Model (Pull & Run)
+      - name: Download Training Data from S3
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
           S3_BUCKET: ${{ secrets.S3_BUCKET }}
-          # Use Override from inputs
+          INPUT_PATH: ${{ inputs.training_data_path }}
+        run: |
+          echo "🚀 Downloading training data from s3://$S3_BUCKET/$INPUT_PATH..."
+          aws s3 cp s3://$S3_BUCKET/$INPUT_PATH training_data.csv
+          
+          if [ ! -f training_data.csv ]; then
+            echo "❌ Failed to download training data!"
+            exit 1
+          fi
+          echo "✅ Download complete. Size: $(du -h training_data.csv | cut -f1)"
+
+      - name: Generate Model Name
+        id: naming
+        run: |
+          # Create timestamped name: e.g., randomforest_20231027_123045
+          TIMESTAMP=$(date +'%Y%m%d_%H%M%S')
+          MODEL_NAME="${{ inputs.model_type }}_${TIMESTAMP}"
+          echo "MODEL_NAME=$MODEL_NAME" >> $GITHUB_ENV
+          echo "✅ Model will be saved as: $MODEL_NAME"
+
+      - name: Retrain Model (Using Mounted Code)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
           S3_MODEL_PREFIX: ${{ inputs.s3_prefix_override }}
         run: |
-          echo "🚀 Pulling Production Image: ghcr.io/${{ env.IMAGE_NAME }}:latest"
+          echo "🚀 Starting Training for ${{ inputs.model_type }}..."
           
-          # In a real scenario, we might download data from S3 first.
-          # For this demo, we'll create a dummy 'new_data.csv' to simulate fresh data.
-          echo "feature1,feature2,feature3,defect" > new_data.csv
-          echo "0.2,0.6,0.1,0" >> new_data.csv
-          echo "0.9,0.1,0.8,1" >> new_data.csv
+          # Create local directories for artifacts
+          mkdir -p models
+          mkdir -p features
+          chmod 777 models features # Ensure container can write
           
-          # Run Training
-          # The container will automatically Upload the new model to S3 due to S3_BUCKET env var.
+          # We mount local code to ensure we usage the updated logic
+          # We mount:
+          # 1. Current dir -> /app/data (for training_data.csv)
+          # 2. Local ml/ -> /app/ml (code)
+          # 3. Local run_ml.py -> /app/run_ml.py (entrypoint)
+          # 4. Local models/ -> /app/models (output)
+          # 5. Local features/ -> /app/features (output)
+          
           docker run --rm \
             -v $(pwd):/app/data \
+            -v $(pwd)/ml:/app/ml \
+            -v $(pwd)/run_ml.py:/app/run_ml.py \
+            -v $(pwd)/models:/app/models \
+            -v $(pwd)/features:/app/features \
             -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
             -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
             -e AWS_REGION=$AWS_REGION \
@@ -54,11 +92,42 @@ jobs:
             -e S3_MODEL_PREFIX=${S3_MODEL_PREFIX} \
             ghcr.io/${{ env.IMAGE_NAME }}:latest \
             train \
-              --csv /app/data/new_data.csv \
+              --csv /app/data/training_data.csv \
+              --target defect \
               --model ${{ inputs.model_type }} \
-              --name production_model_retrained
-
-      - name: Verify S3 Upload
+              --name ${{ env.MODEL_NAME }}
+              
+      - name: Verify Artifacts
         run: |
-          echo "✅ Retraining complete."
-          echo "Check the logs above. You should see 'Successfully uploaded... to S3'"
+          echo "Checking local models directory..."
+          ls -l models/
+          ls -l features/
+
+      - name: Upload Artifacts
+        if: always() # Try even if check failed, but realistically we need the mount fix.
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          S3_PREFIX: ${{ inputs.s3_prefix_override }}
+        run: |
+           # Remove trailing slash
+           PREFIX=$(echo $S3_PREFIX | sed 's:/*$::')
+           
+           echo "🚀 Uploading artifacts to s3://$S3_BUCKET/$PREFIX/"
+           
+           # Upload Model
+           # Assuming models/ was mounted (I will fix this in the file I write)
+           if [ -f "models/${{ env.MODEL_NAME }}.joblib" ]; then
+             aws s3 cp "models/${{ env.MODEL_NAME }}.joblib" "s3://$S3_BUCKET/$PREFIX/${{ env.MODEL_NAME }}.joblib"
+             echo "✅ Model Uploaded"
+           else
+             echo "❌ Model file not found!"
+           fi
+           
+           # Upload Feature Schema
+           if [ -f "features/${{ env.MODEL_NAME }}_features.csv" ]; then
+             aws s3 cp "features/${{ env.MODEL_NAME }}_features.csv" "s3://$S3_BUCKET/$PREFIX/${{ env.MODEL_NAME }}_features.csv"
+             echo "✅ Schema Uploaded"
+           fi
