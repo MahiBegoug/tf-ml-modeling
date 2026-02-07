@@ -530,7 +530,7 @@ class UserTrainingService:
         
         # 7. Create Result
         results = df.copy()
-        results["prediction"] = preds
+        results["fault_prone"] = preds
         results["probability"] = probs
         
         if output_csv:
