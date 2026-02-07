@@ -29,12 +29,23 @@ class UserTrainingService:
     """
     
     def __init__(self, models_dir: str = "models", features_dir: str = "features"):
-        self.models_dir = models_dir
-        self.features_dir = features_dir
-        
-        # Ensure directories exist
-        os.makedirs(models_dir, exist_ok=True)
-        os.makedirs(features_dir, exist_ok=True)
+        # Determine base path for models
+        # In Docker Action, user workspace is /github/workspace, but models are in /app
+        # We check if /app/models exists to prefer the baked-in models
+        if os.path.exists("/app/models") and not os.path.exists(models_dir):
+            base_path = "/app"
+            self.models_dir = os.path.join(base_path, models_dir)
+            self.features_dir = os.path.join(base_path, features_dir)
+            logger.info(f"ℹ️ Running in container. Using baked models at {self.models_dir}")
+        else:
+            self.models_dir = models_dir
+            self.features_dir = features_dir
+
+        # Ensure directories exist (only if we are writing or they don't exist)
+        if not os.path.exists(self.models_dir):
+             os.makedirs(self.models_dir, exist_ok=True)
+        if not os.path.exists(self.features_dir):
+             os.makedirs(self.features_dir, exist_ok=True)
         
         # Initialize internal retraining service
         self.retrainer = RetrainingServiceWithScaler(models_dir, use_scaler=True)
