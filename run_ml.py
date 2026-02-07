@@ -97,9 +97,10 @@ def cmd_predict(args, config):
             # 3. If we download TO service.models_dir, we get /app/models/trained_models/trained_models/... (Double Nesting)
             # 4. So we must download to the PARENT of service.models_dir
             
-            download_target = os.path.dirname(service.models_dir)
-            if not download_target or download_target == "":
-                download_target = "." # Fallback to current dir if models_dir is at root
+            # We want to flatten the structure if possible, or at least control it.
+            # If we set s3_prefix to ".../trained_models/", we get the files directly.
+            # So we should download into service.models_dir.
+            download_target = service.models_dir
             
             download_s3_folder(
                 bucket_name=s3_bucket,

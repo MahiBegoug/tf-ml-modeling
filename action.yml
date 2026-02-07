@@ -29,7 +29,7 @@ inputs:
   s3_model_prefix:
     description: 'S3 Prefix for models'
     required: false
-    default: 'pre_trained_defect_models/'
+    default: 'pre_trained_defect_models/trained_models/'
 
 runs:
   using: 'docker'
