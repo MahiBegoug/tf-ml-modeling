@@ -108,6 +108,12 @@ def cmd_predict(args, config):
                 local_dir=download_target,
                 aws_region=os.getenv('AWS_REGION', 'us-east-1')
             )
+            
+            print(f"🔍 DEBUG: Download target: {download_target}")
+            if os.path.exists(download_target):
+                print(f"🔍 DEBUG: Listing {download_target}: {os.listdir(download_target)}")
+            else:
+                print(f"🔍 DEBUG: {download_target} does not exist.")
         else:
             print(f"⚠️ Model '{model_name}' not found and S3_BUCKET not set. Prediction may fail.")
 
