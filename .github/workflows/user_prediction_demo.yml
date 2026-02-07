@@ -1,6 +1,8 @@
 name: User Prediction Demo
 
 on:
+  repository_dispatch:
+    types: [trigger-prediction]
   workflow_dispatch:
     inputs:
       model_name:
@@ -60,10 +62,14 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
           # Use Override if provided, else Use Secret
-          S3_BUCKET: ${{ inputs.s3_bucket_override || secrets.S3_BUCKET }}
-          S3_MODEL_PREFIX: ${{ inputs.s3_prefix_override || secrets.S3_MODEL_PREFIX }}
+          # Use Override if provided, else Use Secret
+          S3_BUCKET: ${{ (github.event.inputs.s3_bucket_override || github.event.client_payload.s3_bucket_override) || secrets.S3_BUCKET }}
+          S3_MODEL_PREFIX: ${{ (github.event.inputs.s3_prefix_override || github.event.client_payload.s3_prefix_override) || secrets.S3_MODEL_PREFIX }}
+          # Handle Model Name from Input OR Payload
+          MODEL_NAME: ${{ github.event.inputs.model_name || github.event.client_payload.model_name || 'randomforest_model' }}
         run: |
           echo "🚀 Pulling image: ghcr.io/${{ env.IMAGE_NAME }}:latest"
+          echo "ℹ️ Using Model: $MODEL_NAME"
           
           # Run the container
           # -v $(pwd):/app/data  -> Mount current dir to /app/data so we can read input.csv and write output
@@ -79,9 +85,9 @@ jobs:
             ghcr.io/${{ env.IMAGE_NAME }}:latest \
             predict \
               --csv /app/data/input.csv \
-              --model ${{ inputs.model_name }} \
+              --model ${{ env.MODEL_NAME }} \
               --output /app/data/predictions.csv \
-              --threshold ${{ inputs.threshold }}
+              --threshold ${{ inputs.threshold || 0.5 }}
 
 
       - name: Show Results

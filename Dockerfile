@@ -29,5 +29,5 @@ RUN pip install --no-cache-dir .
 COPY . .
 
 # Set entrypoint so arguments are appended
-ENTRYPOINT ["python", "run_ml.py"]
+ENTRYPOINT ["python", "/app/run_ml.py"]
 CMD ["--help"]

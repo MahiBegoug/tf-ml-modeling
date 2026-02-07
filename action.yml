@@ -1,0 +1,52 @@
+name: 'Detailed Defect Prediction'
+description: 'Runs advanced ML models to predict defects in Terraform code.'
+author: 'MahiBegoug'
+inputs:
+  csv_path:
+    description: 'Path to input CSV file'
+    required: true
+  model:
+    description: 'Model to usage (randomforest, xgboost, etc.)'
+    required: false
+    default: 'randomforest'
+  threshold:
+    description: 'Probability threshold'
+    required: false
+    default: '0.5'
+  s3_bucket:
+    description: 'S3 Bucket for artifacts'
+    required: true
+  aws_access_key_id:
+    description: 'AWS Access Key ID'
+    required: true
+  aws_secret_access_key:
+    description: 'AWS Secret Access Key'
+    required: true
+  aws_region:
+    description: 'AWS Region'
+    required: false
+    default: 'us-east-1'
+  s3_model_prefix:
+    description: 'S3 Prefix for models'
+    required: false
+    default: 'pre_trained_defect_models/'
+
+runs:
+  using: 'docker'
+  image: 'docker://ghcr.io/mahibegoug/tf-ml-modeling:latest'
+  args:
+    - "predict"
+    - "--csv"
+    - ${{ inputs.csv_path }}
+    - "--model"
+    - ${{ inputs.model }}
+    - "--threshold"
+    - ${{ inputs.threshold }}
+    - "--output"
+    - "predictions.csv"
+  env:
+    AWS_ACCESS_KEY_ID: ${{ inputs.aws_access_key_id }}
+    AWS_SECRET_ACCESS_KEY: ${{ inputs.aws_secret_access_key }}
+    AWS_REGION: ${{ inputs.aws_region }}
+    S3_BUCKET: ${{ inputs.s3_bucket }}
+    S3_MODEL_PREFIX: ${{ inputs.s3_model_prefix }}
