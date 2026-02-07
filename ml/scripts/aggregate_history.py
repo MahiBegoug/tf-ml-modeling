@@ -99,6 +99,13 @@ def aggregate_prediction_history(
     master_df = pd.concat(all_dfs, ignore_index=True)
     logger.info(f"✓ Aggregated {len(master_df)} total rows from {len(all_dfs)} files.")
     
+    # Deduplicate
+    initial_count = len(master_df)
+    master_df.drop_duplicates(inplace=True)
+    final_count = len(master_df)
+    if initial_count > final_count:
+        logger.info(f"✓ Removed {initial_count - final_count} duplicate rows.")
+    
     # 4. Save Locally
     master_df.to_csv(output_file, index=False)
     logger.info(f"💾 Saved master file to: {output_file}")

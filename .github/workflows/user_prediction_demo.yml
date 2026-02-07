@@ -18,6 +18,11 @@ on:
         description: 'S3 Model Prefix (Optional Override)'
         required: false
         default: 'pre_trained_defect_models/'
+      run_aggregation:
+        description: 'Run History Aggregation?'
+        required: false
+        type: boolean
+        default: true
 
 jobs:
   predict-test:
@@ -85,7 +90,7 @@ jobs:
           cat predictions.csv
 
       - name: Aggregate History (Using Mounted Code)
-        if: success()
+        if: success() && inputs.run_aggregation == true
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
